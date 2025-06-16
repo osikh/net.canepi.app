@@ -19,10 +19,6 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import {
-    restrictToVerticalAxis,
-    restrictToWindowEdges
-} from '@dnd-kit/modifiers';
 import {useDataStore} from "../../hooks/useDataStore.tsx";
 import { FlattenedRequestItem } from "../../types/Api.tsx";
 import { flattenRequestItems } from "../../libs/utils.ts";
@@ -33,6 +29,7 @@ import {createPortal} from "react-dom";
 
 export default function SortableList() {
     const { items, dragEvent, setDragEvent } = useDataStore()
+    const [ activeDragItem, setActiveDragItem ] = useState<FlattenedRequestItem | undefined>();
     const [ flattenedItems, setFlattenedItems ] = useState<FlattenedRequestItem[]>([])
 
     useEffect(() => {
@@ -93,6 +90,9 @@ export default function SortableList() {
         }
 
         setDragEvent(active, activeAncestors, over, overChild)
+
+        const activeFItem = flattenedItems.find(fitem => fitem.id === dragEvent.active)
+        setActiveDragItem(activeFItem)
     }
 
     function handleDragEnd(event: DragEndEvent) {
@@ -148,8 +148,8 @@ export default function SortableList() {
                     className={'text-left'}
                     modifiers={[shiftOverlayToPointer]}
                 >
-                    {dragEvent.active > 0 ? (
-                        <DragOverItem key={dragEvent.active} item={ flattenedItems.find(fitem => fitem.id === dragEvent.active) } />
+                    { (dragEvent.active > 0 && activeDragItem !== undefined) ? (
+                        <DragOverItem key={dragEvent.active} item={ activeDragItem } />
                     ): null}
                 </DragOverlay>,
                 document.body,
