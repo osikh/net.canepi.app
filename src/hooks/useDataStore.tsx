@@ -14,7 +14,7 @@ interface DataStore {
     removeItem: (id: number) => void
     selected: number
     selectItem: (id: number) => void
-    activeCategory: string
+    activeCategory: number
     toggleCategory: (id: number) => void
 }
 
@@ -32,7 +32,7 @@ function updateRecursive(items: RequestItem[], id: number, data: Partial<Request
 export const useDataStore = create<DataStore>((set, get) => ({
     items: [],
     selected: 0,
-    activeCategory: "root",
+    activeCategory: -1, // -1 = root
     dragEvent: {active: 0, activeAncestors: 0, over: 0, overChild: 0},
     setDragEvent: (active: number, activeAncestors: number, over: number, overChild: number) => {
         set({dragEvent: {active, activeAncestors, over, overChild}})
@@ -45,6 +45,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
     },
     addItem: (item) => {
         const newItem: RequestItem = {
+            id: get().items.length + 1,
             parent_id: item.parent_id || 0,
             order_id: item.order_id || 0,
             type: item.type || 'request',
@@ -78,10 +79,10 @@ export const useDataStore = create<DataStore>((set, get) => ({
         set({selected: id})
     },
     toggleCategory: (id) => {
-        // if (get().activeCategory === id) {
-        //     set({ activeCategory: "" })
-        // } else {
-        //     set({ activeCategory: id })
-        // }
+        if (get().activeCategory === id) {
+            set({ activeCategory: -1 })
+        } else {
+            set({ activeCategory: id })
+        }
     }
 }))
