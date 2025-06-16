@@ -1,6 +1,6 @@
-import { create } from 'zustand'
+import {create} from 'zustand'
 import Database from '@tauri-apps/plugin-sql'
-import { nanoid } from 'nanoid'
+import {nanoid} from 'nanoid'
 import debounce from 'lodash.debounce'
 import {RequestItem} from "../types/Api.tsx";
 
@@ -59,7 +59,7 @@ export const useApiStore = create<ApiBrowserStore>((set, get) => ({
         return get().items.find((item) => item.id === id)
     },
     setItems: (items) => {
-        set({ items })
+        set({items})
         persistToDB(items)
     },
     addItem: (item) => {
@@ -81,7 +81,7 @@ export const useApiStore = create<ApiBrowserStore>((set, get) => ({
     },
     updateItem: (id, data) => {
         const updated = get().items.map((item) =>
-            item.id === id ? { ...item, ...data, updated_at: new Date().toISOString() } : item
+            item.id === id ? {...item, ...data, updated_at: new Date().toISOString()} : item
         )
         get().setItems(updated)
     },
@@ -96,13 +96,17 @@ export const useApiStore = create<ApiBrowserStore>((set, get) => ({
         }
         get().setItems(removeRecursively(get().items))
     },
-    requestRename: (id) => { set({ activeRename: id }) },
-    selectItem: (id) => { set({ selected: id }) },
+    requestRename: (id) => {
+        set({activeRename: id})
+    },
+    selectItem: (id) => {
+        set({selected: id})
+    },
     toggleCategory: (id) => {
         if (get().activeCategory === id) {
-            set({ activeCategory: "" })
+            set({activeCategory: ""})
         } else {
-            set({ activeCategory: id })
+            set({activeCategory: id})
         }
     }
 }))
@@ -147,7 +151,7 @@ export async function initDatabase() {
     const roots: RequestItem[] = []
 
     for (const row of result) {
-        map.set(row.id, { ...row, children: [] })
+        map.set(row.id, {...row, children: []})
     }
 
     for (const row of result) {

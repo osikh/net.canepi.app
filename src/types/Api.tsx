@@ -1,15 +1,17 @@
 export type RequestType = 'category' | 'request'
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | null
+export type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
 
 export interface RequestItem {
-    id: string
-    parent_id: string
+    id: number
+    parent_id: number
     order_id: number
     type: RequestType
     name: string
-    method: HttpMethod
+    method: RequestMethod
     data: any
-    created_at: string
-    updated_at: string
+    created_at: Date
+    updated_at: Date
     children?: RequestItem[] // for UI nesting
 }
+
+export type FlattenedRequestItem = RequestItem & { ancestors: number[] }

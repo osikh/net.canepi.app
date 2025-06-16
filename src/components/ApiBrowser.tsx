@@ -10,8 +10,7 @@ export default function ApiBrowser() {
 
     const handleAdd = (type: 'category' | 'request') => {
         const name = prompt(`Enter ${type} name:`)
-        console.log("AddItem::", {name, type, parent_id: getItem(selected)?.type === "category" ? selected : ""})
-        if (name) addItem({name, type, parent_id: getItem(selected)?.type === "category" ? selected : ""})
+        if (name) addItem({name, type})
     }
 
     return (

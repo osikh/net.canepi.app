@@ -1,140 +1,101 @@
 import Database from "@tauri-apps/plugin-sql";
-import { nanoid } from "nanoid";
-import { create } from "zustand";
+import {RequestItem} from "../types/Api.tsx";
+import {useDataStore} from "../hooks/useDataStore.tsx";
 import debounce from "lodash.debounce";
-import { Category, ApiRequest} from "../types/Db.tsx";
 
-export let db: any;
+export const persistToDB = debounce(async (items: RequestItem[]) => {
+    const db = await Database.load('sqlite:%USERPROFILE%/.canepi/personal.db')
 
-export async function initDB() {
-    db = await Database.load("sqlite:requests.db");
+    const flat = flattenItems(items)
 
-    await db.execute(`
-    CREATE TABLE IF NOT EXISTS categories (
-      id TEXT PRIMARY KEY,
-      parent_id TEXT,
-      name TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+    for (const item of flat) {
+        await db.execute(
+            `INSERT INTO requests (id, parent_id, order_id, type, name, method, data, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       ON CONFLICT(id) DO UPDATE SET
+         parent_id = excluded.parent_id,
+         order_id = excluded.order_id,
+         type = excluded.type,
+         name = excluded.name,
+         method = excluded.method,
+         data = excluded.data,
+         updated_at = CURRENT_TIMESTAMP
+      `,
+            [
+                item.id,
+                item.parent_id,
+                item.order_id,
+                item.type,
+                item.name,
+                item.method,
+                JSON.stringify(item.data ?? {})
+            ]
+        )
+    }
+}, 1000)
+
+export async function initDatabase() {
+    const db = await Database.load('sqlite:canepi.db')
 
     await db.execute(`
     CREATE TABLE IF NOT EXISTS requests (
-      id TEXT PRIMARY KEY,
-      parent_id TEXT,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_id INTEGER DEFAULT 0,
+      order_id INTEGER DEFAULT 0,
+      type TEXT CHECK(type IN ('category', 'request')) NOT NULL,
       name TEXT NOT NULL,
-      category TEXT,
-      type TEXT,
-      curl TEXT NOT NULL,
+      method TEXT DEFAULT NULL,
+      data TEXT DEFAULT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+    )
+  `)
 
     await db.execute(`
     CREATE TABLE IF NOT EXISTS connections (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      data TEXT NOT NULL
-    );
-  `);
+      name TEXT,
+      data TEXT
+    )
+  `)
 
     await db.execute(`
     CREATE TABLE IF NOT EXISTS variables (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      key TEXT NOT NULL,
+      name TEXT,
+      key TEXT,
       value TEXT
-    );
-  `);
-}
+    )
+  `)
 
-export async function fetchInitialData() {
-    const categories: Category[] = await db.select("SELECT * FROM categories");
-    const requests: ApiRequest[] = await db.select("SELECT * FROM requests");
-    return { categories, requests };
-}
+    const result = await db.select<RequestItem[]>('SELECT * FROM requests ORDER BY type,name')
 
-export const useAppStore = create<{
-    categories: Category[];
-    requests: ApiRequest[];
-    setCategories: (categories: Category[]) => void;
-    setRequests: (requests: ApiRequest[]) => void;
-    addCategory: (name: string, parent_id?: string | null) => void;
-    addRequest: (
-        name: string,
-        category?: string | 'none',
-        curl?: string | '',
-        parent_id?: string | 'none',
-        type?: string | 'GET'
-    ) => void;
-}>((set, get) => ({
-    categories: [],
-    requests: [],
+    const map = new Map<number, RequestItem>()
+    const roots: RequestItem[] = []
 
-    setCategories: (categories) => {
-        set({ categories });
-        debouncedSync();
-    },
-
-    setRequests: (requests) => {
-        set({ requests });
-        debouncedSync();
-    },
-
-    addCategory: (name, parent_id = null) => {
-        const id = nanoid();
-        const newCategory: Category = {
-            id,
-            name,
-            parent_id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
-        get().setCategories([...get().categories, newCategory]);
-    },
-
-    addRequest: (name, category = 'none', curl = '', parent_id = 'none', type = 'GET') => {
-        const id = nanoid();
-        const newRequest: ApiRequest = {
-            id,
-            name,
-            category,
-            type,
-            curl,
-            parent_id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
-        get().setRequests([...get().requests, newRequest]);
-    },
-}));
-
-const debouncedSync = debounce(async () => {
-    const { categories, requests } = useAppStore.getState();
-
-    await db.execute("DELETE FROM categories");
-    await db.execute("DELETE FROM requests");
-
-    for (const cat of categories) {
-        await db.execute(
-            "INSERT INTO categories (id, parent_id, name) VALUES (?, ?, ?)",
-            [cat.id, cat.parent_id, cat.name]
-        );
+    for (const row of result) {
+        map.set(row.id, { ...row, children: [] })
     }
 
-    for (const req of requests) {
-        await db.execute(
-            "INSERT INTO requests (id, parent_id, name, category, type, curl) VALUES (?, ?, ?, ?, ?, ?)",
-            [req.id, req.parent_id, req.name, req.category, req.type, req.curl]
-        );
+    for (const row of result) {
+        const parent = map.get(row.parent_id)
+        if (parent) {
+            parent.children?.push(map.get(row.id)!)
+        } else if (row.parent_id == 0) {
+            roots.push(map.get(row.id)!)
+        }
     }
-}, 1000);
 
-export async function hydrateStore() {
-    const { categories, requests } = await fetchInitialData();
-    const store = useAppStore.getState();
-    store.setCategories(categories);
-    store.setRequests(requests);
+    console.log(roots)
+
+    useDataStore.getState().setItems(roots)
+}
+
+export async function updateParentId(id: number, newParentId: number) {
+    const db = await Database.load('sqlite:canepi.db')
+
+    await db.execute(
+        `UPDATE requests SET parent_id = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2`,
+        [newParentId, id]
+    )
 }

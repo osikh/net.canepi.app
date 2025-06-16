@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import Drawer from './components/Drawer';
 import ScreenWrapper from './components/ScreenWrapper';
-import {initDatabase} from "./hooks/useApiStore.tsx";
+import {initDatabase} from "./libs/db.ts";
 
 const App: React.FC = () => {
     useEffect(() => {
