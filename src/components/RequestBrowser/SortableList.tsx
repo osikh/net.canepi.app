@@ -40,7 +40,12 @@ export default function SortableList() {
 
     const sensors = useSensors(
         useSensor(MouseSensor),
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            // distinguish between click and drag
+            activationConstraint: {
+                distance: 5,
+            },
+        }),
         useSensor(TouchSensor),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
